@@ -22,7 +22,7 @@ import sys
 import socket
 import re
 # you may use urllib to encode data appropriately
-import urllib.parse
+import urllib.parse as parser
 
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
@@ -68,20 +68,74 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        parsed_url = parser.urlsplit(url)
+        if parsed_url.port:
+            port = parsed_url.port
+        elif parsed_url.scheme == "http":
+            port = 80
+        elif parsed_url.scheme == "https":
+            port = 443
+
+        self.connect(parsed_url.hostname, port)
+
+        query = "?"+parsed_url.query if parsed_url.query else ""
+        path = parsed_url.path if parsed_url.path else "/"
+        request = "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path+query, parsed_url.hostname, )
+        self.socket.send(request.encode("utf-8"))
+        data = self.recvall(self.socket)
+        resp = self.httpResponseParse(data)
+
+        self.close()
+        return HTTPResponse(resp["code"], resp["content"])
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        parsed_url = parser.urlsplit(url)
+        if parsed_url.port:
+            port = parsed_url.port
+        elif parsed_url.scheme == "http":
+            port = 80
+        elif parsed_url.scheme == "https":
+            port = 443
+
+        self.connect(parsed_url.hostname, port)
+
+        query = "?"+parsed_url.query if parsed_url.query else ""
+        path = parsed_url.path if parsed_url.path else "/"
+        request = "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\n" % (path+query, parsed_url.hostname, )
+        if args:
+            body = parser.urlencode(args)
+            request += "Content-Length: %d\r\n\r\n" % (len(body), )
+            request += body
+        else:
+            request += "Content-Length: 0\r\n\r\n"
+        self.socket.send(request.encode("utf-8"))
+        data = self.recvall(self.socket)
+        resp = self.httpResponseParse(data)
+
+        self.close()
+        return HTTPResponse(resp["code"], resp["content"])
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
+    
+    def httpResponseParse(self, msg):
+        msg_list = msg.split("\r\n")
+        ret = {}
+        f_line = msg_list[0].split(' ')
+        ret["protocol"] = f_line[0]
+        ret["code"] = int(f_line[1])
+        ret["code_msg"] = " ".join(f_line[2:])
+        for i in range(1, len(msg_list)):
+            if not msg_list[i]:
+                ret["content"] = msg_list[i+1]
+                break
+            key, val = msg_list[i].split(": ")
+            ret[key] = val
+        return ret
+
     
 if __name__ == "__main__":
     client = HTTPClient()
