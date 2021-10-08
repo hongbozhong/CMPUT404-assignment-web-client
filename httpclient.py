@@ -80,7 +80,7 @@ class HTTPClient(object):
 
         query = "?"+parsed_url.query if parsed_url.query else ""
         path = parsed_url.path if parsed_url.path else "/"
-        request = "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path+query, parsed_url.hostname, )
+        request = "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n" % (path+query, parsed_url.hostname, )
         self.socket.send(request.encode("utf-8"))
         data = self.recvall(self.socket)
         resp = self.httpResponseParse(data)
@@ -99,9 +99,8 @@ class HTTPClient(object):
 
         self.connect(parsed_url.hostname, port)
 
-        query = "?"+parsed_url.query if parsed_url.query else ""
         path = parsed_url.path if parsed_url.path else "/"
-        request = "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\n" % (path+query, parsed_url.hostname, )
+        request = "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nConnection: close\r\n" % (path, parsed_url.hostname, )
         if args:
             body = parser.urlencode(args)
             request += "Content-Length: %d\r\n\r\n" % (len(body), )
